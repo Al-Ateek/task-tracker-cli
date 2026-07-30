@@ -205,12 +205,33 @@ def list_tasks(tasks, status_filter=None):
     if not filter_tasks:
         print(f"No tasks found with status '{status_filter}'")
         return
-    for task in filter_tasks:
+
+    id_width = max(len(str(task["id"])) for task in tasks)
+    status_width = max(len(task["status"]) for task in tasks)
+    desc_width = max(len(task["description"]) for task in tasks)
+    date_width = max(
+        max(len(task["created_at"]), len(task["updated_at"])) for task in tasks
+    )
+
+    id_width = max(id_width, len("id"))
+    status_width = max(status_width, len("status"))
+    desc_width = max(desc_width, len("description"))
+    date_width = max(date_width, len("created_at"))
+
+    print(
+        f"| {'ID':<{id_width}} | {'Status':<{status_width}} | {'Description':<{desc_width}} | {'Created':<{date_width}} | {'Updated':<{date_width}} |"
+    )
+    print(
+        f"--{'-'*id_width}---{'-'*status_width}---{'-'*desc_width}---{'-'*date_width}---{'-'*date_width}--"
+    )
+    for task in tasks:
         print(
-            f"ID: {task['id']} | Status: {task['status']} | Description: {task['description']}"
+            f"| {str(task['id']):<{id_width}} | "
+            f"{task['status']:<{status_width}} | "
+            f"{task['description']:<{desc_width}} | "
+            f"{task['created_at']:<{date_width}} | "
+            f"{task['updated_at']:<{date_width}} |"
         )
-        print(f"    Created: {task['created_at']} | Updated: {task['updated_at']}")
-        print("-" * 80)
 
 
 def positive_int(value):
