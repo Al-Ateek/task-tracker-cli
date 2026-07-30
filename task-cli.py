@@ -5,6 +5,9 @@ from datetime import datetime
 import argparse
 
 TASK_FILE = "tasks.json"
+REQUIRED_KEYS = {"id", "status", "updated_at", "created_at", "description"}
+VALID_STATUS = {"done", "in-progress", "todo"}
+
 
 if not os.path.exists(TASK_FILE):
     try:
@@ -15,6 +18,61 @@ if not os.path.exists(TASK_FILE):
         sys.exit(1)
 
 
+def validate_task(task, index):
+    """Validate a single task object loaded from the tasks.json file.
+    Checks that all required keys exist, that value types are correct, and that
+    the status is one of the accepted values. Strips any unrecognised keys.
+    Returns the cleaned task dict, or None if the task is too broken to use."""
+
+    if not isinstance(task, dict):
+        print(
+            f"Warning: Task at position {index} is not an object - it's skipped.",
+            file=sys.stderr,
+        )
+        return None
+
+    missing = REQUIRED_KEYS - task.keys()
+    if missing:
+        print(
+            f"Warning: Task at position {index} is missing keys {missing} - it's skipped.",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(task["id"], int) or task["id"] <= 0:
+        print(
+            f"Warning: Task at position {index} has an invalid id - it's skipped.",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(task["description"], str) or not task["description"].strip():
+        print(
+            f"Warning: Task at position {index} has an invalid 'description' - it's skipped.",
+            file=sys.stderr,
+        )
+        return None
+
+    if task["status"] not in VALID_STATUS:
+        print(
+            f"Warning: Task at position {index} has an invalid 'status' ('{task['status']}') - it's skipped",
+            file=sys.stderr,
+        )
+        return None
+
+    for date_key in ("created_at", "updated_at"):
+        try:
+            datetime.fromisoformat(task[date_key])
+        except (ValueError, TypeError):
+            print(
+                f"Warning: Task at position {index} has an invalid '{date_key}' ('{task[date_key]}') - it's skipped.",
+                file=sys.stderr,
+            )
+            return None
+
+    return {key: task[key] for key in REQUIRED_KEYS}
+
+
 def load_tasks():
     """Load and return the list of tasks from the JSON file.
     Returns an empty list if the file doesn't exist or contains invalid JSON."""
@@ -22,6 +80,7 @@ def load_tasks():
         return []
     try:
         with open(TASK_FILE, "r") as file:
+            valid_data = []
             data = json.load(file)
             if not isinstance(data, list):
                 print(
@@ -29,6 +88,11 @@ def load_tasks():
                     file=sys.stderr,
                 )
                 return []
+            for i, task in enumerate(data):
+                valid_task = validate_task(task, i)
+                if valid_task is not None:
+                    valid_data.append(valid_task)
+            return valid_data
     except json.JSONDecodeError:
         print(
             "Error: tasks.json contains invalid JSON. Starting fresh.", file=sys.stderr
@@ -37,7 +101,6 @@ def load_tasks():
     except OSError as e:
         print(f"Error: Could not read task file - {e}", file=sys.stderr)
         sys.exit(1)
-    return data
 
 
 def save_tasks(tasks):
