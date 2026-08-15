@@ -206,11 +206,11 @@ def list_tasks(tasks, status_filter=None):
         print(f"No tasks found with status '{status_filter}'")
         return
 
-    id_width = max(len(str(task["id"])) for task in tasks)
-    status_width = max(len(task["status"]) for task in tasks)
-    desc_width = max(len(task["description"]) for task in tasks)
+    id_width = max(len(str(task["id"])) for task in filter_tasks)
+    status_width = max(len(task["status"]) for task in filter_tasks)
+    desc_width = max(len(task["description"]) for task in filter_tasks)
     date_width = max(
-        max(len(task["created_at"]), len(task["updated_at"])) for task in tasks
+        max(len(task["created_at"]), len(task["updated_at"])) for task in filter_tasks
     )
 
     id_width = max(id_width, len("id"))
@@ -224,7 +224,7 @@ def list_tasks(tasks, status_filter=None):
     print(
         f"--{'-'*id_width}---{'-'*status_width}---{'-'*desc_width}---{'-'*date_width}---{'-'*date_width}--"
     )
-    for task in tasks:
+    for task in filter_tasks:
         print(
             f"| {str(task['id']):<{id_width}} | "
             f"{task['status']:<{status_width}} | "
