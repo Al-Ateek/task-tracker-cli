@@ -19,10 +19,21 @@ if not os.path.exists(TASK_FILE):
 
 
 def validate_task(task, index):
-    """Validate a single task object loaded from the tasks.json file.
-    Checks that all required keys exist, that value types are correct, and that
-    the status is one of the accepted values. Strips any unrecognised keys.
-    Returns the cleaned task dict, or None if the task is too broken to use."""
+    """Validate and clean a single task object loaded from tasks.json.  
+  
+    Ensures the entry is a dict, contains all required keys, has correctly  
+    typed values, a status within the accepted set, and parseable ISO 8601  
+    timestamps. Any unrecognised keys are stripped from the returned dict.  
+    A warning is printed to stderr for every rejected task.  
+  
+    Args:  
+        task: The raw object read from the JSON file (expected to be a dict).  
+        index (int): The position of the task in the file, used in warnings.  
+  
+    Returns:  
+        dict | None: A cleaned task dict containing only the required keys,  
+        or None if the task is invalid and should be skipped.  
+    """  
 
     if not isinstance(task, dict):
         print(
@@ -74,8 +85,20 @@ def validate_task(task, index):
 
 
 def load_tasks():
-    """Load and return the list of tasks from the JSON file.
-    Returns an empty list if the file doesn't exist or contains invalid JSON."""
+    """Load, validate, and return the list of tasks from the JSON file.  
+  
+    Reads TASK_FILE, verifies the top-level structure is a list, and passes  
+    each entry through validate_task so that malformed tasks are skipped.  
+    Recoverable problems (missing file, invalid JSON, wrong structure) result  
+    in an empty list; an unreadable file exits the program.  
+  
+    Returns:  
+        list[dict]: The validated tasks. Empty if the file is missing,  
+        contains invalid JSON, or is not a JSON list.  
+  
+    Raises:  
+        SystemExit: If the file exists but cannot be read (OSError).  
+    """
     if not os.path.exists(TASK_FILE):
         return []
     try:
@@ -104,7 +127,14 @@ def load_tasks():
 
 
 def save_tasks(tasks):
-    """Persist the current list of tasks to the JSON file, overwriting any previous content."""
+    """Write the list of tasks to the JSON file, overwriting existing content.  
+  
+    Args:  
+        tasks (list[dict]): The tasks to persist.  
+  
+    Raises:  
+        SystemExit: If the file cannot be written (OSError).  
+    """  
     try:
         with open(TASK_FILE, "w") as file:
             json.dump(tasks, file, indent=4)
@@ -114,19 +144,40 @@ def save_tasks(tasks):
 
 
 def id_generator(tasks):
-    """Generate and return the next available task ID based on the highest existing ID in the list."""
+    """Compute the next available task ID.  
+  
+    Args:  
+        tasks (list[dict]): The current list of tasks.  
+  
+    Returns:  
+        int: 1 if the list is empty, otherwise one greater than the highest  
+        existing task ID.  
+    """  
     if not tasks:
         return 1
     return max(task["id"] for task in tasks) + 1
 
 
 def current_time():
-    """Return the current local time as an ISO 8601 formatted string."""
+    """Return the current local time.  
+  
+    Returns:  
+        str: The current local time as an ISO 8601 formatted string.  
+    """  
     return datetime.now().isoformat()
 
 
 def add_task(tasks, description):
-    """Create a new task with the given description, assign it an ID and timestamps, and append it to the task list."""
+    """Create a new task and append it to the task list, then save.  
+  
+    The description is stripped of surrounding whitespace and rejected if  
+    empty. A new ID and identical created/updated timestamps are assigned,  
+    and the task starts with status "todo".  
+  
+    Args:  
+        tasks (list[dict]): The task list to append to (modified in place).  
+        description (str): The description for the new task.  
+    """  
     description = description.strip()
     if description == "":
         print("Error: Description cannot be empty.", file=sys.stderr)
@@ -146,8 +197,15 @@ def add_task(tasks, description):
 
 
 def find_task(tasks, task_id):
-    """Search the task list for a task matching the given ID.
-    Returns its index if found, or -1 if not found."""
+    """Locate a task by its ID.  
+  
+    Args:  
+        tasks (list[dict]): The task list to search.  
+        task_id (int): The ID to look for.  
+  
+    Returns:  
+        int: The index of the matching task, or -1 if no task has that ID.  
+    """  
     for i, task in enumerate(tasks):
         if task["id"] == task_id:
             return i
@@ -155,8 +213,16 @@ def find_task(tasks, task_id):
 
 
 def update_task(tasks, task_id, description):
-    """Find a task by ID and update its description and updated timestamp.
-    Prints an error to stderr if the ID doesn't exist."""
+    """Update the description of an existing task and refresh its timestamp.  
+  
+    The new description is stripped and rejected if empty. If no task matches  
+    the given ID, an error is printed to stderr and nothing changes.  
+  
+    Args:  
+        tasks (list[dict]): The task list (modified in place).  
+        task_id (int): The ID of the task to update.  
+        description (str): The new description.  
+    """  
     description = description.strip()
     if description == "":
         print("Error: Description cannot be empty.", file=sys.stderr)
@@ -171,8 +237,15 @@ def update_task(tasks, task_id, description):
 
 
 def delete_task(tasks, task_id):
-    """Find a task by ID and remove it from the list, then save.
-    Prints an error to stderr if the ID doesn't exist."""
+    """Remove a task by ID and save the updated list.  
+  
+    If no task matches the given ID, an error is printed to stderr and  
+    nothing is removed.  
+  
+    Args:  
+        tasks (list[dict]): The task list (modified in place).  
+        task_id (int): The ID of the task to delete.  
+    """  
     index = find_task(tasks, task_id)
     if index != -1:
         del tasks[index]
@@ -182,8 +255,16 @@ def delete_task(tasks, task_id):
 
 
 def mark_task(tasks, task_id, status):
-    """Find a task by ID and update its status and updated timestamp.
-    Prints an error to stderr if the ID doesn't exist."""
+    """Set the status of an existing task and refresh its timestamp.  
+  
+    If no task matches the given ID, an error is printed to stderr and  
+    nothing changes.  
+  
+    Args:  
+        tasks (list[dict]): The task list (modified in place).  
+        task_id (int): The ID of the task to update.  
+        status (str): The new status (e.g. "in-progress" or "done").  
+    """  
     index = find_task(tasks, task_id)
     if index != -1:
         tasks[index]["status"] = status
@@ -194,8 +275,17 @@ def mark_task(tasks, task_id, status):
 
 
 def list_tasks(tasks, status_filter=None):
-    """Print all tasks to the terminal.
-    If status_filter is provided, only tasks matching that status are shown."""
+    """Print tasks to the terminal as a formatted, column-aligned table.  
+  
+    Column widths are computed dynamically from the data. If there are no  
+    tasks, or none match the filter, an informational message is printed  
+    instead of a table.  
+  
+    Args:  
+        tasks (list[dict]): The tasks to display.  
+        status_filter (str | None): If provided, only tasks whose status  
+            equals this value are shown.  
+    """  
     if not tasks:
         print("No tasks found.")
         return
@@ -235,7 +325,18 @@ def list_tasks(tasks, status_filter=None):
 
 
 def positive_int(value):
-    """Argparse type validator that rejects zero and negative integers."""
+    """Argparse type validator that accepts only positive integers.  
+  
+    Args:  
+        value (str): The raw command-line argument.  
+  
+    Returns:  
+        int: The parsed positive integer.  
+  
+    Raises:  
+        argparse.ArgumentTypeError: If the value is not an integer or is  
+            zero or negative.  
+    """  
     try:
         int_value = int(value)
     except ValueError:
@@ -248,8 +349,12 @@ def positive_int(value):
 
 
 def main():
-    """Entry point of the CLI.
-    Parses command-line arguments and dispatches to the appropriate task function."""
+    """Entry point of the CLI.  
+  
+    Builds the argument parser with subcommands (add, update, delete,  
+    mark-in-progress, mark-done, list), loads the current tasks, and  
+    dispatches to the appropriate task function based on the chosen command.  
+    """
     parser = argparse.ArgumentParser(description="Task Tracker CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
